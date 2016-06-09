@@ -26,6 +26,7 @@ class HTTPStatusPlugin {
   const STATUS_CODE_OPTIONS_FILTER = 'jelle_s_http_status_code_options';
   const SHUNT_SAVE_CODE = 'jelle_s_http_status_shunt_save_code';
   const PRE_SAVE_CODE = 'jelle_s_http_status_pre_save_code';
+  const HTTP_STATUS_NONE = 0;
 
   /**
    * Registers all actions and filters for this plugin.
@@ -36,7 +37,9 @@ class HTTPStatusPlugin {
   public function __construct($pluginName) {
     // Core actions.
     yourls_add_action('activated_' . $pluginName . '/plugin.php', array($this, 'onPluginActivated'));
+    yourls_add_action('plugins_loaded', array($this, 'onPluginsLoaded'));
     yourls_add_action('html_head', array($this, 'onHtmlHead'));
+    yourls_add_action('admin_page_before_form', array($this, 'onAdminPageBeforeForm'));
     yourls_add_action('delete_link', array($this,'onDeleteLink'));
 
     // Own, custom actions.
@@ -62,11 +65,25 @@ class HTTPStatusPlugin {
   }
 
   /**
+   * Registers the admin page.
+   */
+  public function onPluginsLoaded() {
+    yourls_register_plugin_page(str_replace('_', '-', static::HTTP_STATUS_KEY), 'Default status code', array($this, 'doDisplayAdminPage') );
+  }
+
+  /**
    * Outputs our JavaScript.
    */
   public function onHtmlHead() {
     echo '<script type="text/javascript">' . "\n" . 'var JELLE_S_HTTP_STATUS_KEY = "' . static::HTTP_STATUS_KEY . '";' . "\n" . '' . file_get_contents(__DIR__ . '/js/http-status.js') . '</script>';
     echo '<style>'. file_get_contents(__DIR__ . '/css/http-status.css') . '</style>';
+  }
+
+  /**
+   * Adds info about the configured default status code to the header.
+   */
+  public function onAdminPageBeforeForm() {
+    echo '<p>' . yourls_s('Current configured default status code is: <strong>%s</strong>', $this->getCodeOptionLabel($this->getDeafaultStatusCode()));
   }
 
   /**
@@ -82,7 +99,7 @@ class HTTPStatusPlugin {
    * AJAX callback: Displays the config form.
    */
   public function onDisplayConfigForm() {
-    yourls_verify_nonce('config-http-status-link_' . $_REQUEST['id'], $_REQUEST['nonce'], FALSE, 'An error occurred.');
+    yourls_verify_nonce('config-http-status-link_' . $_REQUEST['id'], $_REQUEST['nonce'], FALSE, yourls__('An error occurred.'));
     $row = $this->getTableConfigRow($_REQUEST['keyword']);
     echo json_encode(array('html' => $row));
   }
@@ -91,9 +108,50 @@ class HTTPStatusPlugin {
    * AJAX callback: Saves the status code to the database.
    */
   public function onSave() {
-    yourls_verify_nonce( 'config-http-status-save_'.$_REQUEST['id'], $_REQUEST['nonce'], FALSE, 'An error occurred' );
+    yourls_verify_nonce( 'config-http-status-save_' . $_REQUEST['id'], $_REQUEST['nonce'], FALSE, yourls__('An error occurred.'));
     $return = $this->doSave($_REQUEST['keyword'], $_REQUEST['code'], $_REQUEST['oldcode']);
     echo json_encode($return);
+  }
+
+  /**
+   * Displays the admin page.
+   */
+  public function doDisplayAdminPage() {
+    if (isset($_POST[static::HTTP_STATUS_KEY])) {
+      yourls_verify_nonce(static::HTTP_STATUS_KEY, $_REQUEST['nonce'], FALSE, yourls__('An error occurred.'));
+      $code = intval($_POST[static::HTTP_STATUS_KEY]);
+      if ($code) {
+        yourls_update_option(static::HTTP_STATUS_KEY, $code );
+        echo '<script type="text/javascript">feedback("' . yourls__('Default redirect status code was saved successfully.') . '", "success");</script>';
+      }
+    }
+
+    $code = $this->getDeafaultStatusCode();
+    $nonce = yourls_create_nonce(static::HTTP_STATUS_KEY);
+    $options = '';
+    foreach ($this->getCodeOptions() as $option_code => $option) {
+      $options .= '<option ' . ($option_code === $code ? 'selected="selected" ' : '') . '>' . $option . '</option>';
+    }
+    $status_key = static::HTTP_STATUS_KEY;
+    $form = <<<FORM
+    <h2>%s</h2>
+    <p>%s</p>
+    <form method="post">
+      <input type="hidden" name="nonce" value="$nonce" />
+      <label for="$status_key">%s:</label>
+      <select id="$status_key" name="$status_key">
+        $options
+      </select>
+      <input type="submit" value="%s" />
+    </form>
+FORM;
+    echo sprintf(
+      $form,
+      yourls__('Default redirect status code'),
+      yourls_s('This plugin allows you to configure the default redirect status code. Selecting "%s" means that this plugin will not interfere with the status code given by YOURLS or an other plugin. Selecting any other value means that this plugin will overwrite the status code with the selected default for all links, unless a specific status code for this link was selected.', $this->getCodeOptionLabel(static::HTTP_STATUS_NONE)),
+      yourls__('Select default redirect status code'),
+      yourls__('Save')
+    );
   }
 
   /**
@@ -135,7 +193,7 @@ class HTTPStatusPlugin {
     if (!$info) {
       return $info;
     }
-    $info[static::HTTP_STATUS_KEY] = $this->getStatusCode($keyword);
+    $info[static::HTTP_STATUS_KEY] = $this->getStatusCode($keyword, static::HTTP_STATUS_NONE);
     return $info;
   }
 
@@ -185,9 +243,10 @@ class HTTPStatusPlugin {
   /**
    * Sets the correct redirect code for a short url.
    */
-  public function alterRedirectCode() {
+  public function alterRedirectCode($code) {
     global $keyword;
-    return $this->getStatusCode($keyword);
+    $configured_code = $this->getStatusCode($keyword);
+    return $configured_code !== static::HTTP_STATUS_NONE ? $configured_code : $code;
   }
 
   /**
@@ -210,7 +269,7 @@ class HTTPStatusPlugin {
 
     // Check if we need to do an insert or update.
     $existing_record = $ydb->get_var('SELECT code FROM ' . $table . ' WHERE keyword = "' . $keyword . '";');
-    $query = $existing_record ? "UPDATE $table SET code='$code' WHERE keyword = '$keyword';" : "INSERT INTO $table (code, keyword) VALUES ('$code', '$keyword');";
+    $query = !is_null($existing_record) ? "UPDATE $table SET code='$code' WHERE keyword = '$keyword';" : "INSERT INTO $table (code, keyword) VALUES ('$code', '$keyword');";
     $success = $ydb->query( $query );
 
     // Return the right message.
@@ -236,12 +295,20 @@ class HTTPStatusPlugin {
    */
   protected function getCodeOptions() {
     return yourls_apply_filter(static::STATUS_CODE_OPTIONS_FILTER, array(
-      '301' => yourls__('301: Moved Permanently'),
-      '302' => yourls__('302: Found'),
-      '303' => yourls__('303: See Other'),
-      '307' => yourls__('307: Temporary Redirect'),
-      '308' => yourls__('308: Permanent Redirect'),
+      static::HTTP_STATUS_NONE => yourls__('Use default status code'),
+      301 => yourls__('301: Moved Permanently'),
+      302 => yourls__('302: Found'),
+      303 => yourls__('303: See Other'),
+      307 => yourls__('307: Temporary Redirect'),
+      308 => yourls__('308: Permanent Redirect'),
     ));
+  }
+
+  /**
+   * Helper function: Get the default status code.
+   */
+  protected function getDeafaultStatusCode() {
+    return intval(yourls_get_option(static::HTTP_STATUS_KEY, static::HTTP_STATUS_NONE));
   }
 
   /**
@@ -254,12 +321,15 @@ class HTTPStatusPlugin {
   /**
    * Helper function: Get the status code for a keyword.
    */
-  protected function getStatusCode($keyword) {
+  protected function getStatusCode($keyword, $default = FALSE) {
     global $ydb;
+    if ($default === FALSE) {
+      $default = $this->getDeafaultStatusCode();
+    }
     $keyword = yourls_escape( yourls_sanitize_string( $keyword ) );
     $sql = "SELECT c.code FROM ". $this->getFullTableName() ." c INNER JOIN " . YOURLS_DB_TABLE_URL . " u ON u.keyword = c.keyword WHERE u.keyword='$keyword'";
     $code = $ydb->get_var($sql);
-    return $code ? $code : 301;
+    return (!$code || $code === static::HTTP_STATUS_NONE) ? $default : $code;
   }
 
   /**
@@ -271,7 +341,7 @@ class HTTPStatusPlugin {
     $code = yourls_get_keyword_info($keyword, static::HTTP_STATUS_KEY);
     $nonce = yourls_create_nonce('config-http-status-save_' . $id);
     $code_options = $this->getCodeOptions();
-    if ($code) {
+    if ($code || $code === static::HTTP_STATUS_NONE) {
       $code_options_html = '';
       foreach ($code_options as $code_option => $option_label) {
         $code_options_html .= '<option value="' . $code_option . '" ' . ($code_option == $code ? 'selected="selected"' : '') . '>' . $option_label . '</option>' . "\n";
@@ -296,7 +366,7 @@ RETURN;
       $return = sprintf(urldecode($return), yourls__('HTTP status code'), yourls__('Save'), yourls__('Save HTTP status code'), yourls__('Cancel'), yourls__('Cancel editing'));
     }
     else {
-      $return = '<tr class="config-http-status-row notfound"><td colspan="6" class="config-http-status-row notfound">' . yourls__('Error, URL not found') . '</td></tr>';
+      $return = '<tr class="config-http-status-row notfound"><td colspan="6" class="config-http-status-row notfound">' . yourls__('Error, URL not found.') . '</td></tr>';
     }
 
     $return = yourls_apply_filter(static::TABLE_ROW_FILTER, $return, $keyword, $code);

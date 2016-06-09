@@ -11,12 +11,12 @@ var jelle_s_http_status_code = {
     var keyword = $('#keyword_' + id).val();
     var nonce = get_var_from_query($('#config-http-status-button-' + id).attr('href'), 'nonce');
     $.getJSON(
-            ajaxurl,
-            {action: "config_http_status_display", keyword: keyword, nonce: nonce, id: id},
-    function (data) {
-      $("#id-" + id).after(data.html);
-      end_loading('#actions-' + id + ' .button');
-    }
+      ajaxurl,
+      {action: "config_http_status_display", keyword: keyword, nonce: nonce, id: id},
+      function (data) {
+        $("#id-" + id).after(data.html);
+        end_loading('#actions-' + id + ' .button');
+      }
     );
   };
 
