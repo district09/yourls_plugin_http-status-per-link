@@ -83,7 +83,7 @@ class HTTPStatusPlugin {
    * Adds info about the configured default status code to the header.
    */
   public function onAdminPageBeforeForm() {
-    echo '<p>' . yourls_s('Current configured default status code is: <strong>%s</strong>', $this->getCodeOptionLabel($this->getDeafaultStatusCode()));
+    echo '<p>' . yourls_s('Current configured default status code is: <strong>%s</strong>', $this->getCodeOptionLabel($this->getDefaultStatusCode()));
   }
 
   /**
@@ -126,7 +126,7 @@ class HTTPStatusPlugin {
       }
     }
 
-    $code = $this->getDeafaultStatusCode();
+    $code = $this->getDefaultStatusCode();
     $nonce = yourls_create_nonce(static::HTTP_STATUS_KEY);
     $options = '';
     foreach ($this->getCodeOptions() as $option_code => $option) {
@@ -307,7 +307,7 @@ FORM;
   /**
    * Helper function: Get the default status code.
    */
-  protected function getDeafaultStatusCode() {
+  protected function getDefaultStatusCode() {
     return intval(yourls_get_option(static::HTTP_STATUS_KEY, static::HTTP_STATUS_NONE));
   }
 
@@ -324,7 +324,7 @@ FORM;
   protected function getStatusCode($keyword, $default = FALSE) {
     global $ydb;
     if ($default === FALSE) {
-      $default = $this->getDeafaultStatusCode();
+      $default = $this->getDefaultStatusCode();
     }
     $keyword = yourls_escape( yourls_sanitize_string( $keyword ) );
     $sql = "SELECT c.code FROM ". $this->getFullTableName() ." c INNER JOIN " . YOURLS_DB_TABLE_URL . " u ON u.keyword = c.keyword WHERE u.keyword='$keyword'";
