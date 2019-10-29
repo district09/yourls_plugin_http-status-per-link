@@ -9,5 +9,7 @@
             "email": "sebreghts.jelle@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "ext-xml": "*"
+    }
 }
