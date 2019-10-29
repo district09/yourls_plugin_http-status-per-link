@@ -1,0 +1,13 @@
+{
+    "name": "digipolisgent/yourls-http-status-per-link",
+    "description": "YOURLS plugin to configure an HTTP status per link.",
+    "type": "yourls-plugin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jelle Sebreghts",
+            "email": "sebreghts.jelle@gmail.com"
+        }
+    ],
+    "require": {}
+}
