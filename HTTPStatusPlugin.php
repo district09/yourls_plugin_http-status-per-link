@@ -20,12 +20,12 @@ class HTTPStatusPlugin {
   /**
    * Constants.
    */
-  const TABLENAME = 'jelle_s_http_status_codes';
-  const HTTP_STATUS_KEY = 'jelle_s_http_status_code';
-  const TABLE_ROW_FILTER = 'jelle_s_http_status_code_table_row';
-  const STATUS_CODE_OPTIONS_FILTER = 'jelle_s_http_status_code_options';
-  const SHUNT_SAVE_CODE = 'jelle_s_http_status_shunt_save_code';
-  const PRE_SAVE_CODE = 'jelle_s_http_status_pre_save_code';
+  const TABLENAME = 'http_status_codes';
+  const HTTP_STATUS_KEY = 'http_status_code';
+  const TABLE_ROW_FILTER = 'http_status_code_table_row';
+  const STATUS_CODE_OPTIONS_FILTER = 'http_status_code_options';
+  const SHUNT_SAVE_CODE = 'http_status_shunt_save_code';
+  const PRE_SAVE_CODE = 'http_status_pre_save_code';
   const HTTP_STATUS_NONE = 0;
 
   /**
@@ -91,8 +91,11 @@ class HTTPStatusPlugin {
    */
   public function onDeleteLink($args) {
     global $ydb;
-    $keyword = yourls_escape(yourls_sanitize_string($args[0]));
-    $ydb->query("DELETE FROM ". $this->getFullTableName() ." WHERE keyword = '$keyword';");
+    $sql = "DELETE FROM '.$this->getFullTableName().' WHERE keyword = :keyword";
+    $binds = array(
+      'keyword' => $args[0]
+    ); // array of parameter key => parameter value
+    $ydb->query($sql, $binds);
   }
 
   /**
@@ -181,7 +184,7 @@ FORM;
       'id' => "config-http-status-button-$id",
       'title' => yourls_esc_attr__('Configure HTTP status code'),
       'anchor' => yourls__('HTTP status code'),
-      'onclick' => "jelle_s_http_status_code.display('$id');return false;",
+      'onclick' => "http_status_code.display('$id');return false;",
     );
     return $links;
   }
@@ -254,25 +257,22 @@ FORM;
    */
   protected function doSave($keyword, $code, $oldcode) {
     // Allow plugins to short-circuit the whole function.
-	$pre = yourls_apply_filter(static::SHUNT_SAVE_CODE, NULL, $keyword, $code, $oldcode);
-	if ( NULL !== $pre ) {
-	  return $pre;
+  	$pre = yourls_apply_filter(static::SHUNT_SAVE_CODE, NULL, $keyword, $code, $oldcode);
+  	if ( NULL !== $pre ) {
+  	  return $pre;
     }
 
-	global $ydb;
-	$code = yourls_escape(yourls_sanitize_int($code));
-	$keyword = yourls_escape(yourls_sanitize_string( $keyword ));
+  	global $ydb;
     $table = $this->getFullTableName();
-
     // Allow plugins to act before saving.
-	yourls_do_action(static::PRE_SAVE_CODE, $keyword, $code, $oldcode);
-
+  	yourls_do_action(static::PRE_SAVE_CODE, $keyword, $code, $oldcode);
     // Check if we need to do an insert or update.
-    $existing_record = $ydb->get_var('SELECT code FROM ' . $table . ' WHERE keyword = "' . $keyword . '";');
-    $query = !is_null($existing_record) ? "UPDATE $table SET code='$code' WHERE keyword = '$keyword';" : "INSERT INTO $table (code, keyword) VALUES ('$code', '$keyword');";
-    $success = $ydb->query( $query );
-
-    // Return the right message.
+    // $existing_record = $ydb->fetchValue('SELECT code FROM '.$this->getFullTableName().' WHERE keyword = :keyword', array('table'=>$table, 'keyword'=>$keyword));
+    // $query = !is_null($existing_record) ? 'UPDATE '.$this->getFullTableName().' SET code = :code WHERE keyword = :keyword' : 'INSERT INTO '.$this->getFullTableName().' (code, keyword) VALUES (:code, :keyword)';
+    $success = $ydb->perform('INSERT INTO '.$this->getFullTableName().' (code, keyword) VALUES (:code, :keyword) ON DUPLICATE KEY UPDATE code = :code',array(
+      'code'=>$code,
+      'keyword'=>$keyword
+    ));
     if ($success || ($oldcode == $code && $success === 0)) {
       $return['code'] = $this->getCodeOptionLabel($code);
       $return['status']  = 'success';
@@ -282,7 +282,7 @@ FORM;
       $return['status']  = 'fail';
       $return['message'] = /* //translators: "Error updating HTTP status code for http://sho.rt/blah" */ yourls_s('Error updating HTTP status code for %s', $keyword) ;
     }
-	return yourls_apply_filter( 'edit_link', $return, $keyword, $code, $oldcode);
+  	return yourls_apply_filter( 'edit_link', $return, $keyword, $code, $oldcode);
   }
 
   protected function getCodeOptionLabel($code) {
@@ -326,9 +326,10 @@ FORM;
     if ($default === FALSE) {
       $default = $this->getDefaultStatusCode();
     }
-    $keyword = yourls_escape( yourls_sanitize_string( $keyword ) );
-    $sql = "SELECT c.code FROM ". $this->getFullTableName() ." c INNER JOIN " . YOURLS_DB_TABLE_URL . " u ON u.keyword = c.keyword WHERE u.keyword='$keyword'";
-    $code = $ydb->get_var($sql);
+    $sql = 'SELECT c.code FROM '.$this->getFullTableName().' c INNER JOIN '.YOURLS_DB_TABLE_URL.' u ON u.keyword = c.keyword WHERE u.keyword=:keyword';
+    $code = $ydb->fetchValue($sql, array(
+      'keyword'=>$keyword
+    ));
     return (!$code || $code === static::HTTP_STATUS_NONE) ? $default : $code;
   }
 
@@ -355,8 +356,8 @@ FORM;
     </select>
   </td>
   <td colspan="1">
-    <input type="button" id="config-http-status-submit-$id" name="config-http-status-submit-$id" value="%s" title="%s" class="button" onclick="jelle_s_http_status_code.save('$id');" />&nbsp;
-    <input type="button" id="config-http-status-close-$id" name="config-http-status-close-$id" value="%s" title="%s" class="button" onclick="jelle_s_http_status_code.hide('$id');" />
+    <input type="button" id="config-http-status-submit-$id" name="config-http-status-submit-$id" value="%s" title="%s" class="button" onclick="http_status_code.save('$id');" />&nbsp;
+    <input type="button" id="config-http-status-close-$id" name="config-http-status-close-$id" value="%s" title="%s" class="button" onclick="http_status_code.hide('$id');" />
     <input type="hidden" id="nonce_$id" value="$nonce"/>
     <input type="hidden" id="keyword_$id" value="$keyword"/>
     <input type="hidden" id="old_code_$id" value="$code"/>
