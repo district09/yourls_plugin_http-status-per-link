@@ -20,12 +20,12 @@ class HTTPStatusPlugin {
   /**
    * Constants.
    */
-  const TABLENAME = 'http_status_codes';
-  const HTTP_STATUS_KEY = 'http_status_code';
-  const TABLE_ROW_FILTER = 'http_status_code_table_row';
-  const STATUS_CODE_OPTIONS_FILTER = 'http_status_code_options';
-  const SHUNT_SAVE_CODE = 'http_status_shunt_save_code';
-  const PRE_SAVE_CODE = 'http_status_pre_save_code';
+  const TABLENAME = 'jelle_s_http_status_codes';
+  const HTTP_STATUS_KEY = 'jelle_s_http_status_code';
+  const TABLE_ROW_FILTER = 'jelle_s_http_status_code_table_row';
+  const STATUS_CODE_OPTIONS_FILTER = 'jelle_s_http_status_code_options';
+  const SHUNT_SAVE_CODE = 'jelle_s_http_status_shunt_save_code';
+  const PRE_SAVE_CODE = 'jelle_s_http_status_pre_save_code';
   const HTTP_STATUS_NONE = 0;
 
   /**
@@ -184,7 +184,7 @@ FORM;
       'id' => "config-http-status-button-$id",
       'title' => yourls_esc_attr__('Configure HTTP status code'),
       'anchor' => yourls__('HTTP status code'),
-      'onclick' => "http_status_code.display('$id');return false;",
+      'onclick' => "jelle_s_http_status_code.display('$id');return false;",
     );
     return $links;
   }
@@ -356,8 +356,8 @@ FORM;
     </select>
   </td>
   <td colspan="1">
-    <input type="button" id="config-http-status-submit-$id" name="config-http-status-submit-$id" value="%s" title="%s" class="button" onclick="http_status_code.save('$id');" />&nbsp;
-    <input type="button" id="config-http-status-close-$id" name="config-http-status-close-$id" value="%s" title="%s" class="button" onclick="http_status_code.hide('$id');" />
+    <input type="button" id="config-http-status-submit-$id" name="config-http-status-submit-$id" value="%s" title="%s" class="button" onclick="jelle_s_http_status_code.save('$id');" />&nbsp;
+    <input type="button" id="config-http-status-close-$id" name="config-http-status-close-$id" value="%s" title="%s" class="button" onclick="jelle_s_http_status_code.hide('$id');" />
     <input type="hidden" id="nonce_$id" value="$nonce"/>
     <input type="hidden" id="keyword_$id" value="$keyword"/>
     <input type="hidden" id="old_code_$id" value="$code"/>
