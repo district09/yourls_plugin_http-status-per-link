@@ -4,7 +4,7 @@ YOURLS plugin: Configure HTTP status codes per link.
 
 Yourls plugin to allow you to select 3XX Status Code to return per keyword.
 
-Plugin tested for YOURLS 1.7
+Plugin tested for YOURLS > 1.7.3
 
 
 ## Installation
